@@ -1,0 +1,14 @@
+{
+  "message": {
+    "role": "assistant",
+    "content": [
+      {
+        "text": "<thinking>The user wants to see MCP tools available for checking card service health. However:\n\n1. The orchestrator's available tools only include:\n   - account_agent\n   - ledger_agent\n   - card_agent\n   - calculator\n\n2. There's no dedicated \"health check\" tool for card services\n3. Card Agent exists but its parameters don't include health checks\n4. Previous attempts showed no card service health monitoring capability\n\nSince:\n- No card-specific health check tool exists in available tools\n- Card Agent's purpose is for card details, not health status\n- The user's request can't be fulfilled with current tools\n\nMust clarify that card service health checks aren't supported and show available tools.</thinking>\n\nAvailable tools for health checks:\n- **account_agent**: Checks Account Service health\n- **ledger_agent**: Checks Ledger Service health\n\n**Card Service Health Check**: Not supported  \nCurrent system configuration doesn't include tools for card service health monitoring. For card details, use `card_agent` with valid queries. If you need card health status, please contact technical support."
+      }
+    ]
+  },
+  "message_id": 36,
+  "redact_message": null,
+  "created_at": "2025-09-26T00:15:05.449668+00:00",
+  "updated_at": "2025-09-26T00:15:05.449671+00:00"
+}
