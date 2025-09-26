@@ -1,10 +1,13 @@
 import logging
 import boto3
 
+from main_memory import main_memory
+
 from strands import Agent, tool
 from strands.models import BedrockModel
 from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
+
 
 CARD_SYSTEM_PROMPT = """
     You are card agent specialized to handle all informations about CARD such as:
@@ -30,6 +33,8 @@ CARD_SYSTEM_PROMPT = """
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+logger.info("Starting the Card Agent...")
 
 # Create boto3 session
 session = boto3.Session(
@@ -64,11 +69,17 @@ def card_agent(query: str) -> str:
     """
     logger.info("function => card_agent")
 
-    # Format the query for the agent
-    formatted_query = f"Please process the following query: {query}"
-    
-    all_tools = []
+    token = main_memory.get_token()
+    if not token:
+        logger.error("Error, I couldn't process No JWT token available")
+        return "Error, but I couldn't process No JWT token available"
+         
+    context={"jwt":token}
 
+    # Format the query for the agent
+    formatted_query = f"Please process the following query: {query} with context:{context}"
+    all_tools = []
+    
     try:
         logger.info("Routed to Card Agent")
         
@@ -91,7 +102,7 @@ def card_agent(query: str) -> str:
             if len(text_response) > 0:
                 return text_response
 
-            return "I apologize, but I couldn't process this request due a problem. Please check if your query is clearly stated or try rephrasing it."
+            return "Error, I couldn't process this request due a problem. Please check if your query is clearly stated or try rephrasing it."
     
     except Exception as e:
         # Return specific error message for math processing

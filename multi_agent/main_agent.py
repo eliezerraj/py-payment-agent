@@ -6,6 +6,8 @@ from strands import Agent
 from strands.models import BedrockModel
 from strands_tools import calculator
 
+from main_memory import main_memory
+
 from account_agent import account_agent
 from ledger_agent import ledger_agent
 from card_agent import card_agent
@@ -27,7 +29,8 @@ MAIN_SYSTEM_PROMPT = """
         - Card Agent: Handle all CARD subjects, healthy, etc.
     
     4. Handle all healthy status for all agents mention above 
-        - ALWAYS reply with EXACTLY with a service name: HEALTHY or UNHEALTHY, DO NOT include any explanations or other text. Whenever a request contains more than one service SHOW a list of services, NEVER sumarize the response. 
+        - ALWAYS reply with EXACTLY with a service name: HEALTHY or UNHEALTHY, DO NOT include any explanations or other text. Whenever a request contains more than one service SHOW a list of services, NEVER sumarize the response.
+        - The ONLY EXCEPTION do not reply EXACTLY with a service name: HEALTHY or UNHEALTHY, is when a ERROR occurs.
 
     Always confirm your understanding before routing to ensure accurate assistance.
 """
@@ -57,7 +60,7 @@ conversation_manager = SlidingWindowConversationManager(
 )
 
 # Create a session manager with a unique session ID
-session_manager = FileSessionManager(session_id="eliezer-session-01",
+session_manager = FileSessionManager(session_id="eliezer-session-03",
                                      storage_dir="./sessions")
 
 # create strands agent
@@ -71,6 +74,10 @@ agent_main =    Agent(name="main",
                      conversation_manager=conversation_manager,
                      session_manager=session_manager,
                      callback_handler=None)
+
+# set a token singleton memory 
+TOKEN = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJpc3MiOiJnby1vYXV0aC1sYW1iZGEiLCJ2ZXJzaW9uIjoiMi4xIiwiand0X2lkIjoiZjg1NmQyZTgtZGEzMy00ZGIyLWEwOTctOWU2ZTU3NWMzNDVkIiwidXNlcm5hbWUiOiJ1c2VyLTAzIiwidGllciI6InRpZXItMDMiLCJhcGlfYWNjZXNzX2tleSI6IkFQSV9BQ0NFU1NfS0VZX1VTRVJfMDMiLCJzY29wZSI6WyJ0ZXN0LnJlYWQiLCJ0ZXN0LndyaXRlIiwiYWRtaW4iXSwiZXhwIjoxNzU5MDE0ODIzfQ.TMut_pM6inWcm02j7dim11ukD1P7jqQ_SkYwDG0GcGg7cvhPvgSiKOa9UFaqbrKAEGRcHG8Q7bFLFbX0v9oht2CMcKrNUZWdqScY3LdB-xaWLSAyaWDjYHfnm_rc_DZ7YOD3OjH5KaFMFL5OE0K-n1AhwGcYTSQLSLSxyOIe7jWJ_hiIsSDpb-kV_wejzwotk4mgM2x9A7fCMIMibJCRSua6biCfF99mNrJT3RmIyzIUrI_1PlLFIIrloviTyXrvSAwmAb8KE2pJkO_y0I0fNvbTx5-4IXvjzhv6BhyiLvJfdP488D_tyGucp9N9zAr7wQ-iHC5xzqrsd9aYLlKUN-k9E13fMWg-X3mbyRC-7N8oHE2K99AsyvK0DruepP9n2pCKadgbvNLA9t_yD9oxSmxGG27IAXCKPiqQmsUYQzUjuTE7iwYfIgAiZHzdHeptr6Yh9G5HG3w_KTDBOTklemhfMw9eJjkOTL0uKPk-DkuyC0O_-nYSu7TC4uPnAEtaC_87Bbpo__z_NVteBVvJ7b1eRY2_IB8udSpSRpiI0ogEWm5sc7IL61kKyCqLpu6vRDxewFnhyW83x16iZrRsAGPLiDcIto3gLqm_MPKqpPcbf4cxCfeKuAbtgPmMN19mD46a4lOWJIQ8Ds2kuwK8wJ2wdb4u0d01jtRBDoFHq2E"
+main_memory.set_token(TOKEN)
 
 # Clean the final response
 def strip_thinking(text: str) -> str:
@@ -110,14 +117,15 @@ if __name__ == "__main__":
                 print("Please enter a valid message.")
                 continue
 
-            response = agent_main(
-                user_input.strip(), 
-            )
-            
+            token = main_memory.get_token()
+            if not token:
+                print("No JWT provided, NOT AUTHORIZED !!!")
+                continue
+    
             print('\033[1;31m  Processing... \033[0m \n')
+            response = agent_main(user_input.strip())
 
             print('\033[44m *.*.* \033[0m' * 15)
-
             final_response = str(response)
             print(strip_thinking( final_response.lower().strip()) )
 
