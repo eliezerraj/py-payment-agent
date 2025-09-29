@@ -9,12 +9,12 @@ from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
 
 LEDGER_SYSTEM_PROMPT = """
-    You are ledger agent specialized to handle all LEDGER informations such as bank statement, financial moviment, account activity and balance.
+    You are LEDGER agent specialized to handle all LEDGER informations such as bank statement, financial moviment, account activity and account balances.
 
     Ledger Activity :
-        1. get_account_statement: Get account activity, balance ans statement from a given account
-            - args: Account Id
-            - response: A list of bank statement, financial moviment, account activity and balance summary 
+        1. get_account_statement: Get account activity, account balances and statements from a given account
+            - args: account id
+            - response: A list of bank statement, financial moviment, account activity and account balance summary 
         2. ledger_healthy: healthy ledger service status
             - response: only the status code from api, consider 200 as healthy, otherwise unhealthy
 

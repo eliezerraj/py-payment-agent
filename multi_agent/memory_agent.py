@@ -8,36 +8,41 @@ from strands.models import BedrockModel
 from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
 
-CARD_SYSTEM_PROMPT = """
-    You are CARD agent specialized to handle all informations about CARD such as payments done (amount, date, type and model), card status, atc, mcc, holder
+MEMORY_SYSTEM_PROMPT = """
+    You are memory agent specialized to handle(STORE and RETRIEVE) all MEMORIES of a memory graph database.
 
-    Card Operations:
-        1. get_card: Get CARD details such as holder, atc, type, model (CREDIT or DEBIT)
-            - args: Card Id, ALWAYS use the format 999.999.999.999
-            - response: Card details like, assount id, CARD number, atc, etc
-        2. card_healthy: healthy CARD service status
-            - response: only the status code from api, consider 200 as healthy, otherwise unhealthy
-        3. get_card_payments: Get all payments did by a CARD such as FOOD, GAS, COMPUTE, 
-            - args: Card Id, ALWAYS use the format 999.999.999.999 and payment date (format YYYY-MM-DD). In case the payment date not informad use the current date with a format YYYY-MM-DD
-            - response:  - list: A list of payments with information such as CARD type, CARD model, payment amount, terminal, payment status and payment date
+    Memory Activity :
+        1. store_memory_graph_account: Store all account information and its relations in memory graph account
+            - args:
+                - account: account identificator
+                - person: person identificator
+                - relations: relation between account and person, this relation MUST BE 'HAS'
+            - response: 
+                - JUST a confirmation if the data aws store with successful or failed
 
-    Card Rules:
-        1. All credit CARD numbers MUST be returned strictly in the format: 999.999.999.999
-            - Exactly 12 digits split into 4 groups of 3 digits each.
-            - Use '.' as the separator.
-        2. If the input does not contain a valid card number, respond with: "INVALID FORMAT".
-        3. Convert and format all dates using the format YYYY-MM-DD
-        4. Never output raw digits without formatting.
+        2. retrieve_memory_graph_account: Retrive from memory graph all account informations
+            - args:
+                - account: account identificator
+            - response:
+                - list: list of person_id (owner) of account
 
-    Definitions:
-        Always use the mcp tools provided
-"""
+        3. store_memory_graph_card: Store all card information and its relation in memory graph account
+            - args
+                - card: card identificator
+                - account: account identificator
+                - relations: relation between card and account, this relation MUST BE 'ISSUED'
+            - response: 
+                - JUST a confirmation if the data aws store with successful or failed 
+
+    Definitions and rules:
+        - The RETRIEVE choice is ALWAYS triggered when you receive a EXPLICITY requesr in a past tense question, such words as last, previous, latter, final, late. etc
+    """
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-logger.info("Starting the Card Agent...")
+logger.info("Starting the Memory Agent...")
 
 # Create boto3 session
 session = boto3.Session(
@@ -60,31 +65,31 @@ def create_streamable_http_mcp_server():
 streamable_http_mcp_server = MCPClient(create_streamable_http_mcp_server)
 
 @tool
-def card_agent(query: str) -> str:
+def memory_agent(query: str) -> str:
     """
-    Process and respond all card queries using a specialized card agent.
+    Process and respond all request and queries using a memory graph knowledge.
     
     Args:
-        query: Given an card get information and details such as healthy status, card´s details, creation date, etc
+        query: requests knowledges and memories stored
         
     Returns:
-        card with its details
+        a memory from memory graph database
     """
-    logger.info("function => card_agent()")
-
+    logger.info("function => memory_agent()")
+   
     token = main_memory.get_token()
     if not token:
         logger.error("Error, I couldn't process No JWT token available")
-        return "Error, but I couldn't process No JWT token available"
+        return "Error, I couldn't process No JWT token available"
          
     context={"jwt":token}
 
     # Format the query for the agent
     formatted_query = f"Please process the following query: {query} with context:{context}"
     all_tools = []
-    
+ 
     try:
-        logger.info("Routed to Card Agent")
+        logger.info("Routed to Memory Agent")
         
         with streamable_http_mcp_server:
             all_tools.extend(streamable_http_mcp_server.list_tools_sync())
@@ -93,7 +98,7 @@ def card_agent(query: str) -> str:
 
             # Create the math agent with calculator capability
             agent = Agent(name="main",
-                        system_prompt=CARD_SYSTEM_PROMPT,
+                        system_prompt=MEMORY_SYSTEM_PROMPT,
                         model=bedrock_model, 
                         tools=all_tools,
                         callback_handler=None

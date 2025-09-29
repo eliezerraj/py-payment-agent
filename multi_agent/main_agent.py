@@ -1,16 +1,19 @@
 import logging
 import boto3
 import re
+import asyncio
 
 from strands import Agent
 from strands.models import BedrockModel
 from strands_tools import calculator
 
 from main_memory import main_memory
+from login_manager import LoginManager
 
 from account_agent import account_agent
 from ledger_agent import ledger_agent
 from card_agent import card_agent
+from memory_agent import memory_agent
 
 from strands.agent.conversation_manager import SlidingWindowConversationManager
 from strands.session.file_session_manager import FileSessionManager
@@ -20,18 +23,24 @@ MAIN_SYSTEM_PROMPT = """
     You are main agent, an orchestrator designed to coordinate support across multiple subjects. Your role is:
 
     1. Handle information about ACCOUNT:
-        - Account Agent: Handle all ACCOUNT subjects, healthy, etc
+        - Account Agent: Handle all ACCOUNT subjects, account healthy status, etc.
     
     2. Handle information about LEDGER:
-        - Ledger Agent: Handlet all LEDGER information such as bank statement, financial moviment, account activity, balance summary, healthy, etc
+        - Ledger Agent: Handlet all LEDGER information such as bank statement, financial moviment, account activity, account balance summary, ledger healthy status, etc.
     
     3. Handle information about CARD:
-        - Card Agent: Handle all CARD subjects, healthy, etc.
+        - Card Agent: Handle all CARD subjects, payments done by a card, card healthy status, payment amout and date, etc.
     
-    4. Handle all healthy status for all agents mention above 
+    4. Handle all healthy status for all agents mention above:
         - ALWAYS reply with EXACTLY with a service name: HEALTHY or UNHEALTHY, DO NOT include any explanations or other text. Whenever a request contains more than one service SHOW a list of services, NEVER sumarize the response.
         - The ONLY EXCEPTION do not reply EXACTLY with a service name: HEALTHY or UNHEALTHY, is when a ERROR occurs.
 
+    5. Store and retrieve data, insights and memories to/from your custom memort graph knowledge database:
+        - Memory Agent: Handle all MEMORIES of agents above.
+        - This agent is a complementary step, it might be triggered in the begin, when a memory is retrieve or in final when a memory is stored.
+        - The MEMORY agent should be triggered whenever a question/query is repeated.
+        - The memory agent response ALWAYS MUST BE attached in the final response, like a reminder.
+        
     Always confirm your understanding before routing to ensure accurate assistance.
 """
 
@@ -69,15 +78,12 @@ agent_main =    Agent(name="main",
                      model=bedrock_model,
                      tools=[account_agent, 
                             ledger_agent, 
-                            card_agent, 
+                            card_agent,
+                            memory_agent, 
                             calculator],
                      conversation_manager=conversation_manager,
                      session_manager=session_manager,
                      callback_handler=None)
-
-# set a token singleton memory 
-TOKEN = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJpc3MiOiJnby1vYXV0aC1sYW1iZGEiLCJ2ZXJzaW9uIjoiMi4xIiwiand0X2lkIjoiZjg1NmQyZTgtZGEzMy00ZGIyLWEwOTctOWU2ZTU3NWMzNDVkIiwidXNlcm5hbWUiOiJ1c2VyLTAzIiwidGllciI6InRpZXItMDMiLCJhcGlfYWNjZXNzX2tleSI6IkFQSV9BQ0NFU1NfS0VZX1VTRVJfMDMiLCJzY29wZSI6WyJ0ZXN0LnJlYWQiLCJ0ZXN0LndyaXRlIiwiYWRtaW4iXSwiZXhwIjoxNzU5MDE0ODIzfQ.TMut_pM6inWcm02j7dim11ukD1P7jqQ_SkYwDG0GcGg7cvhPvgSiKOa9UFaqbrKAEGRcHG8Q7bFLFbX0v9oht2CMcKrNUZWdqScY3LdB-xaWLSAyaWDjYHfnm_rc_DZ7YOD3OjH5KaFMFL5OE0K-n1AhwGcYTSQLSLSxyOIe7jWJ_hiIsSDpb-kV_wejzwotk4mgM2x9A7fCMIMibJCRSua6biCfF99mNrJT3RmIyzIUrI_1PlLFIIrloviTyXrvSAwmAb8KE2pJkO_y0I0fNvbTx5-4IXvjzhv6BhyiLvJfdP488D_tyGucp9N9zAr7wQ-iHC5xzqrsd9aYLlKUN-k9E13fMWg-X3mbyRC-7N8oHE2K99AsyvK0DruepP9n2pCKadgbvNLA9t_yD9oxSmxGG27IAXCKPiqQmsUYQzUjuTE7iwYfIgAiZHzdHeptr6Yh9G5HG3w_KTDBOTklemhfMw9eJjkOTL0uKPk-DkuyC0O_-nYSu7TC4uPnAEtaC_87Bbpo__z_NVteBVvJ7b1eRY2_IB8udSpSRpiI0ogEWm5sc7IL61kKyCqLpu6vRDxewFnhyW83x16iZrRsAGPLiDcIto3gLqm_MPKqpPcbf4cxCfeKuAbtgPmMN19mD46a4lOWJIQ8Ds2kuwK8wJ2wdb4u0d01jtRBDoFHq2E"
-main_memory.set_token(TOKEN)
 
 # Clean the final response
 def strip_thinking(text: str) -> str:
@@ -98,7 +104,25 @@ if __name__ == "__main__":
     print("- show me the information about account ACC-100")
     print("- which are the accounts from person P-2")
     print("- show me all financial statements account ACC-1000") 
-    print("Type 'exit' to quit.")
+    print("Type 'exit' to quit. \n")
+
+    print('\033[1;31m Please login before continuing ... \033[0m \n')
+    login_manager = LoginManager()
+    
+    while not login_manager.is_authenticated():
+        username = input("username: ")
+        password = input("password: ")
+
+        res_login = asyncio.run(login_manager.login(username, password))
+
+        if res_login:
+            print('\033[1;31m login succesfull, lets go ... \033[0m \n')
+        else:
+            print('\033[1;31m credentials invalid !, try again ... \033[0m \n')
+
+        # set a token singleton memory
+        main_memory.set_token(login_manager.get_token())
+        logger.info(f"token: {main_memory.get_token()}")
 
     # Interactive loop
     while True:

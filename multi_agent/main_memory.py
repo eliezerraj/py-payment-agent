@@ -13,6 +13,5 @@ class MainMemory:
     def get_token(self) -> str:
         return self.jwt
 
-
 # global instance
 main_memory = MainMemory()
