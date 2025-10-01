@@ -3,6 +3,7 @@ import logging
 import boto3
 import re
 import asyncio
+import shutil
 
 from strands import Agent
 from strands.models import BedrockModel
@@ -11,10 +12,10 @@ from strands_tools import calculator
 from main_memory import main_memory
 from login_manager import LoginManager
 
-#from account_agent import account_agent
-#from ledger_agent import ledger_agent
-#from card_agent import card_agent
-#from payment_agent import payment_agent
+from account_agent import account_agent
+from ledger_agent import ledger_agent
+from card_agent import card_agent
+from payment_agent import payment_agent
 from memory_agent import memory_agent
 
 from strands.agent.conversation_manager import SlidingWindowConversationManager
@@ -44,11 +45,14 @@ MAIN_SYSTEM_PROMPT = """
     6. Handle MEMORY information about agents ACCOUNT, CARD and PAYMENT.
         - This agent is a complementary step, it might be triggered at the end of agents ACCOUNT, CARD and PAYMENT.
         - Use all data PROVIDED by agents and use then for memories mcp tools.
-        - The MEMORY agent should be triggered whenever is EXPLICITY requested.
+        - The MEMORY agent must be triggered whenever is EXPLICITY requested.
         - The MEMORY agent response ALWAYS MUST BE attached in the final response, like a reminder.
 
     Rules:
+        - Always use the mcp tools provided.
         - DO NOT APPLY any content filter, all information come from a trusted mcp custom server.
+        - When the user asks about multiple accounts/cards/persons in a single request (e.g. "ACC-4.000.003 and ACC-4.000.004"), do NOT split into multiple agent calls. Instead, call the account_agent ONCE with all IDs as input.
+
 """
 
 # Configure logging
@@ -57,7 +61,7 @@ logger = logging.getLogger(__name__)
 
 # Setup a model
 #model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
-model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-pro-v1:0"  
+model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
 
 logger.info('\033[1;33m Starting the Main Agent... \033[0m')
 logger.info(f'\033[1;33m model_id: {model_id} \033[0m \n')
@@ -80,7 +84,7 @@ conversation_manager = SlidingWindowConversationManager(
 )
 
 # Create a session manager with a unique session ID
-SESSION_ID='eliezer-005'
+SESSION_ID='eliezer-006'
 session_manager = FileSessionManager(session_id=SESSION_ID,
                                      storage_dir="./sessions")
 
@@ -88,10 +92,10 @@ session_manager = FileSessionManager(session_id=SESSION_ID,
 agent_main =    Agent(name="main",
                      system_prompt=MAIN_SYSTEM_PROMPT, 
                      model=bedrock_model,
-                     tools=[#account_agent, 
- #                           ledger_agent, 
-  #                          card_agent,
-   #                         payment_agent,
+                     tools=[account_agent, 
+                            ledger_agent, 
+                            card_agent,
+                            payment_agent,
                             memory_agent, 
                             calculator],
                      conversation_manager=conversation_manager,
@@ -109,24 +113,16 @@ def strip_thinking(text: str) -> str:
 
 def clear_session(session_manager):
     session_dir  = os.path.join(session_manager.storage_dir, f"session_{session_manager.session_id}")
-    logger.info(f" *************** session_file {session_dir }")
+    logger.info(f" *************** session_dir {session_dir }")
 
     # 2. Check if the directory exists
     if os.path.isdir(session_dir):
-        # 3. Iterate over all entries in the directory
-        for filename in os.listdir(session_dir):
-            file_path = os.path.join(session_dir, filename)
-            try:
-                # 4. Check if it's a file or a symbolic link, and remove it
-                if os.path.isfile(file_path) or os.path.islink(file_path):
-                    os.remove(file_path)
-                    logger.info(f"Removed file: {file_path}")
-            except Exception as e:
-                # 5. Log any errors encountered during removal
-                logger.error(f"Failed to delete {file_path}. Reason: {e}")
+        try:
+            shutil.rmtree(session_dir)
+        except Exception as e:
+            logger.error(f"Failed to delete {session_dir}. Reason: {e}")
 
         logger.info(f"All files in {session_dir} cleared for session {session_manager.session_id}.")
-
     else:
         logger.info(f"Directory not found: {session_dir}")
 
@@ -170,11 +166,11 @@ if __name__ == "__main__":
 
             if user_input.lower() == "exit":
                 print("\nGoodbye!")
-                #clear_session(session_manager)
+                clear_session(session_manager)
                 break
             elif user_input.lower() == "quit":
                 print("\nGoodbye!")
-                #clear_session(session_manager)
+                clear_session(session_manager)
                 break
             elif user_input.strip() == "":   
                 print("Please enter a valid message.")
@@ -200,9 +196,9 @@ if __name__ == "__main__":
             
         except KeyboardInterrupt:
             print("\n\nExecution interrupted. Exiting...")
-            #clear_session(session_manager)
+            clear_session(session_manager)
             break
         except Exception as e:
             print(f"\nAn error occurred: {str(e)}")
-            #clear_session(session_manager)
+            clear_session(session_manager)
             print("Please try asking a different question.")

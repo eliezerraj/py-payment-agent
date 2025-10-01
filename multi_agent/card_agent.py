@@ -15,7 +15,9 @@ CARD_SYSTEM_PROMPT = """
         1. get_card: Get CARD details such as accoount, atc, type, model (CREDIT or DEBIT), status.
             - args: card number (card_number).
             - response: card details such as account identificator(account_id), atc, card type, card model (CREDIT or DEBIT), card status.
+        
         2. card_healthy: healthy CARD service status.
+            - This tool must be triggered ONLY with a EXPLICITY requested.
             - response: only the status code from api, consider 200 as healthy, otherwise unhealthy.
  
     Card Rules:

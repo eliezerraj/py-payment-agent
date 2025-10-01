@@ -15,7 +15,9 @@ LEDGER_SYSTEM_PROMPT = """
         1. get_account_statement: Get account activity, account balances and statements from a given account (account id).
             - args: account identificator (account_id).
             - response: A list of bank statement, financial moviment, account activity and account balance summary.
+        
         2. ledger_healthy: healthy ledger service status.
+            - This tool must be triggered ONLY with a EXPLICITY requested.
             - response: only the status code from api, consider 200 as healthy, otherwise unhealthy.
 
     Definitions and rules:
@@ -30,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 # Setup a model
 #model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
-model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-pro-v1:0"  
+model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
 
 logger.info('\033[1;33m Starting the Ledger Agent... \033[0m')
 logger.info(f'\033[1;33m model_id: {model_id} \033[0m \n')

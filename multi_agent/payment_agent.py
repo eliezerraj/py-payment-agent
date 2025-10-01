@@ -17,6 +17,7 @@ PAYMENT_SYSTEM_PROMPT = """
             - response: A list of payments with information such as card id, card type, card model, payment amount, terminal, payment status and payment date.
 
         2. payment_healthy: healthy PAYMENT service status.
+            - This tool must be triggered ONLY with a EXPLICITY requested.
             - response: only the status code from api, consider 200 as healthy, otherwise unhealthy.
 
     Payment Rules:

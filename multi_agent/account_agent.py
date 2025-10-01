@@ -12,15 +12,16 @@ ACCOUNT_SYSTEM_PROMPT = """
     You are ACCOUNT agent specialized to handle all informations about ACCOUNT.
 
     Account Operations:
-        1. get_account: Get account details such as account id (account_id), owner account (person_id), date of creation (created_at) from a given account.
+        1. get_account: Get account details such as account id (account_id), owner account (person_id), date of creation (created_at) from a given account (account_id)
             - args: account identificator (account_id).
             - response: account details like, account id (account_id), person id (owner account), date of creation (created_at).
         
-        2. get_accounts_from_person: get all accounts associated a given person.
+        2. get_accounts_from_person: get all accounts associated/belongs a given person (person_id).
             - args: person identificator (person_id).
             - reponse: List of accounts owned by a given person, account id (account_id), owner account (person_id), date of creation (created_at).
         
         3. account_healthy: healthy account service status.
+            - This tool must be triggered ONLY with a EXPLICITY requested.
             - response: only the status code from api, consider 200 as healthy, otherwise unhealthy.
 
     Definitions and rules:
@@ -89,7 +90,7 @@ def account_agent(query: str) -> str:
 
             selected_tools = [
                 t for t in all_tools 
-                if t.tool_name in ["account_healthy", "get_account", "get_accounts_from_person"]
+                if t.tool_name in ["account_healthy", "get_account", "get_account_from_person"]
             ]
 
             logger.info(f"Available MCP tools: {[tool.tool_name for tool in selected_tools]}")
