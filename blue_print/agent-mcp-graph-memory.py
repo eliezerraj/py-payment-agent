@@ -61,7 +61,6 @@ MEMORY_SYSTEM_PROMPT="""
         Reply with EXACTLY ONE WORD - either "store","retrieve" or "skip".
         DO NOT include any explanations or other text.
 
-        You MUST aware about queries about code.
         The RETRIEVE choice is ALWAYS regard a past tense question, such words as last, previous, latter, final, late. etc
 
         Examples:

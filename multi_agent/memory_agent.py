@@ -8,36 +8,47 @@ from strands.models import BedrockModel
 from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
 
-ACCOUNT_SYSTEM_PROMPT = """
-    You are ACCOUNT agent specialized to handle all informations about ACCOUNT.
+MEMORY_SYSTEM_PROMPT = """
+    You are memory agent specialized to handle(STORE) all MEMORIES of a memory graph database.
 
-    Account Operations:
-        1. get_account: Get account details such as account id (account_id), owner account (person_id), date of creation (created_at) from a given account.
-            - args: account identificator (account_id).
-            - response: account details like, account id (account_id), person id (owner account), date of creation (created_at).
-        
-        2. get_accounts_from_person: get all accounts associated a given person.
-            - args: person identificator (person_id).
-            - reponse: List of accounts owned by a given person, account id (account_id), owner account (person_id), date of creation (created_at).
-        
-        3. account_healthy: healthy account service status.
-            - response: only the status code from api, consider 200 as healthy, otherwise unhealthy.
+    Memory Activity :
+        1. store_account_memory: Store the ACCOUNT its relation with PERSON in memory graph account.
+            - args:
+                - account: account id (account_id)
+                - person: person id (person_id).
+                - relations: relation between account and person, this relation MUST BE 'HAS'.
+            - response: 
+                - JUST a confirmation if the data aws store with successful or failed.
+
+        2. store_card_memory: Store the CARD its relation with ACCOUNT in memory graph account.
+            - args
+                - card: card number, card id, type, model.
+                - account: account id.
+                - relations: relation between card and account, this relation MUST BE 'ISSUED'.
+            - response: 
+                - JUST a confirmation if the data aws store with successful or failed.
+
+        3. store_payment_memory: Store the PAYMENT its relation with CARD in memory graph account.
+            - args
+                - payment: payment id, currency, amount, mcc, payment date, status.
+                - card: card number.
+                - relations: relation between card and payment, this relation MUST BE 'PAY'.
+            - response: 
+                - JUST a confirmation if the data aws store with successful or failed.
 
     Definitions and rules:
-        - Always use the mcp tools provided.
-        - USE EXACTLY the fields names provided by json response. ex: account_id, person_id, etc.
-        - DO NOT UPDATE any field format provided by mcp tool, use EXACTLY the mcp field result format.
-"""
+        - The all STORE choice is ALWAYS triggered when you receive a EXPLICITY request.
+    """
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Setup a model
-#model_id = lite pro premier
-model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-pro-v1:0"  
+#model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
+model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
 
-logger.info('\033[1;33m Starting the Account Agent... \033[0m')
+logger.info('\033[1;33m Starting the Memory Agent... \033[0m')
 logger.info(f'\033[1;33m model_id: {model_id} \033[0m \n')
 
 # Create boto3 session
@@ -58,17 +69,17 @@ def create_streamable_http_mcp_server():
 streamable_http_mcp_server = MCPClient(create_streamable_http_mcp_server)
 
 @tool
-def account_agent(query: str) -> str:
+def memory_agent(query: str) -> str:
     """
-    Process and respond all ACCOUNT queries using a specialized ACCOUNT agent.
+    Process and respond all memory request and queries using a memory graph knowledge.
     
     Args:
-        query: Given account identificator, get all information and details such as healthy status, account details such as account id, person id (owner), creation date, etc.
+        query: requests knowledges and memories stored.
         
     Returns:
-        an account with all details.
+        a memory from memory graph database.
     """
-    logger.info("function => account_agent")
+    logger.info("function => memory_agent()")
    
     token = main_memory.get_token()
     if not token:
@@ -82,21 +93,21 @@ def account_agent(query: str) -> str:
     all_tools = []
  
     try:
-        logger.info("Routed to Account Agent")
+        logger.info("Routed to Memory Agent")
         
         with streamable_http_mcp_server:
             all_tools.extend(streamable_http_mcp_server.list_tools_sync())
 
             selected_tools = [
                 t for t in all_tools 
-                if t.tool_name in ["account_healthy", "get_account", "get_accounts_from_person"]
+                if t.tool_name in ["store_account_memory", "store_card_memory", "store_payment_memory"]
             ]
 
             logger.info(f"Available MCP tools: {[tool.tool_name for tool in selected_tools]}")
 
             # Create the math agent with calculator capability
             agent = Agent(name="main",
-                        system_prompt=ACCOUNT_SYSTEM_PROMPT,
+                        system_prompt=MEMORY_SYSTEM_PROMPT,
                         model=bedrock_model, 
                         tools=selected_tools,
                         callback_handler=None

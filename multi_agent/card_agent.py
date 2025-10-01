@@ -1,43 +1,51 @@
 import logging
 import boto3
 
+from main_memory import main_memory
+
 from strands import Agent, tool
 from strands.models import BedrockModel
 from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
 
 CARD_SYSTEM_PROMPT = """
-    You are card agent specialized to handle all informations about CARD such as:
+    You are CARD agent specialized to handle all informations about CARD such as account, atc, type, model (CREDIT or DEBIT), status.
 
     Card Operations:
-        1. get_card: Get card details from a endpoint via rest call api
-            - args: Card Id, ALWAYS use the format 999.999.999.999
-            - response: Card details like, assount id, card number, atc, etc
-        2. card_healthy: healthy card service status
-            - response: only the status code from api, consider 200 as healthy, otherwise unhealthy
-
+        1. get_card: Get CARD details such as accoount, atc, type, model (CREDIT or DEBIT), status.
+            - args: card number (card_number).
+            - response: card details such as account identificator(account_id), atc, card type, card model (CREDIT or DEBIT), card status.
+        2. card_healthy: healthy CARD service status.
+            - response: only the status code from api, consider 200 as healthy, otherwise unhealthy.
+ 
     Card Rules:
-        1. All credit card numbers MUST be returned strictly in the format: 999.999.999.999
+        1. All CARD numbers MUST be returned strictly in the format: 999.999.999.999
             - Exactly 12 digits split into 4 groups of 3 digits each.
             - Use '.' as the separator.
         2. If the input does not contain a valid card number, respond with: "INVALID FORMAT".
-        3. Never output raw digits without formatting.
+        3. Convert and format all dates using the format YYYY-MM-DD
 
-    Definitions:
-        Always use the mcp tools provided
+    Definitions and rules:
+        - Always use the mcp tools provided.
+        - USE EXACTLY the fields names provided by json response. ex: account_id, person_id, card_number, etc.
+        - DO NOT UPDATE any field format provided by mcp tool, use EXACTLY the mcp field result format.
 """
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Setup a model
+#model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
+model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-pro-v1:0"  
+
+logger.info('\033[1;33m Starting the Card Agent... \033[0m')
+logger.info(f'\033[1;33m model_id: {model_id} \033[0m \n')
+
 # Create boto3 session
 session = boto3.Session(
     region_name='us-east-2',
 )
-
-# Setup a model
-model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
 
 bedrock_model = BedrockModel(
         model_id=model_id,
@@ -54,34 +62,45 @@ streamable_http_mcp_server = MCPClient(create_streamable_http_mcp_server)
 @tool
 def card_agent(query: str) -> str:
     """
-    Process and respond all card queries using a specialized card agent.
+    Process and respond all CARD queries using a specialized CARD agent.
     
     Args:
-        query: Given an card get information and details such as healthy status, card´s details, creation date, etc
+        query: Given an card nunber get information and details such as card service healthy status, card´s details such as card number, card model, card status, model, creation date, etc.
         
     Returns:
-        card with its details
+        a card with its details.
     """
-    logger.info("function => card_agent")
+    logger.info("function => card_agent()")
+
+    token = main_memory.get_token()
+    if not token:
+        logger.error("Error, I couldn't process No JWT token available")
+        return "Error, but I couldn't process No JWT token available"
+         
+    context={"jwt":token}
 
     # Format the query for the agent
-    formatted_query = f"Please process the following query: {query}"
-    
+    formatted_query = f"Please process the following query: {query} with context:{context}"
     all_tools = []
-
+    
     try:
         logger.info("Routed to Card Agent")
         
         with streamable_http_mcp_server:
             all_tools.extend(streamable_http_mcp_server.list_tools_sync())
 
-            logger.info(f"Available MCP tools: {[tool.tool_name for tool in all_tools]}")
+            selected_tools = [
+                t for t in all_tools 
+                if t.tool_name in ["card_healthy", "get_card"]
+            ]
+
+            logger.info(f"Available MCP tools: {[tool.tool_name for tool in selected_tools]}")
 
             # Create the math agent with calculator capability
             agent = Agent(name="main",
                         system_prompt=CARD_SYSTEM_PROMPT,
                         model=bedrock_model, 
-                        tools=all_tools,
+                        tools=selected_tools,
                         callback_handler=None
                     )
             
@@ -91,7 +110,7 @@ def card_agent(query: str) -> str:
             if len(text_response) > 0:
                 return text_response
 
-            return "I apologize, but I couldn't process this request due a problem. Please check if your query is clearly stated or try rephrasing it."
+            return "Error, I couldn't process this request due a problem. Please check if your query is clearly stated or try rephrasing it."
     
     except Exception as e:
         # Return specific error message for math processing
