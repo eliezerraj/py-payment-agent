@@ -13,10 +13,10 @@ from main_memory import main_memory
 from login_manager import LoginManager
 
 from account_agent import account_agent
-from ledger_agent import ledger_agent
+#from ledger_agent import ledger_agent
 from card_agent import card_agent
-from payment_agent import payment_agent
-from memory_agent import memory_agent
+#from payment_agent import payment_agent
+#from memory_agent import memory_agent
 
 from strands.agent.conversation_manager import SlidingWindowConversationManager
 from strands.session.file_session_manager import FileSessionManager
@@ -25,14 +25,18 @@ from strands.session.file_session_manager import FileSessionManager
 MAIN_SYSTEM_PROMPT = """
     You are main agent, an orchestrator designed to coordinate support across multiple subjects. Your role is:
 
-    1. Handle information about ACCOUNT:
-        - Account Agent: Handle all ACCOUNT subjects, account healthy status, etc.
+    1. Handle all subjects about ACCOUNT using Account Agent: 
+        - HEALTHY status: Show the account service healthy status.     
+        - GET: Get all account informations. 
+        - CREATE: Create an account.
     
     2. Handle information about LEDGER:
         - Ledger Agent: Handlet all LEDGER information such as bank statement, financial moviment, account activity, account balance summary, ledger healthy status, etc.
-    
-    3. Handle information about CARD:
-        - Card Agent: Handle all CARD subjects, card healthy status, etc.
+
+    3. Handle all subjects about CARD using Card Agent: 
+        - HEALTHY status: Show the card service healthy status.     
+        - GET: Get all card informations. 
+        - CREATE: Create a card.
 
     4. Handle information about PAYMENT:
         - Payment Agent: Handle all PAYMENT subjects, payments done by a card, paymennt healthy status, payment amout and date, etc.
@@ -60,7 +64,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Setup a model
-#model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
+#model_id = lite pro premier
 model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
 
 logger.info('\033[1;33m Starting the Main Agent... \033[0m')
@@ -93,10 +97,10 @@ agent_main =    Agent(name="main",
                      system_prompt=MAIN_SYSTEM_PROMPT, 
                      model=bedrock_model,
                      tools=[account_agent, 
-                            ledger_agent, 
+                            #ledger_agent, 
                             card_agent,
-                            payment_agent,
-                            memory_agent, 
+                            #payment_agent,
+                            #memory_agent, 
                             calculator],
                      conversation_manager=conversation_manager,
                      session_manager=session_manager,
@@ -113,7 +117,7 @@ def strip_thinking(text: str) -> str:
 
 def clear_session(session_manager):
     session_dir  = os.path.join(session_manager.storage_dir, f"session_{session_manager.session_id}")
-    logger.info(f" *************** session_dir {session_dir }")
+    logger.info(f"Cleaning session files: {session_dir }")
 
     # 2. Check if the directory exists
     if os.path.isdir(session_dir):
@@ -129,7 +133,7 @@ def clear_session(session_manager):
 # Example usage
 if __name__ == "__main__":
     
-    print('\033[1;33m Multi Agent v0.4 \033[0m \n')
+    print('\033[1;33m Multi Agent v0.5 \033[0m \n')
 
     print("This agent helps to interact with another agent.")
     print("Try commands like: /n")

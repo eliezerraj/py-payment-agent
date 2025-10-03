@@ -9,16 +9,21 @@ from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
 
 LEDGER_SYSTEM_PROMPT = """
-    You are LEDGER agent specialized to handle all LEDGER informations such as bank statement, financial moviment, account activity and account balances.
+    You are LEDGER agent specialized to handle informations about LEDGER.
 
-    Ledger Activity :
-        1. get_account_statement: Get account activity, account balances and statements from a given account (account id).
-            - args: account identificator (account_id).
-            - response: A list of bank statement, financial moviment, account activity and account balance summary.
+    Ledger Operations :
+        1. get_account_statement: get account activity, account balances and statements from a given account (account id).
+            - args: 
+                - account: account identificator (account_id).
+            - response: 
+                - list: A list of bank statement, financial moviment, account activity and balance summary.
         
-        2. ledger_healthy: healthy ledger service status.
-            - This tool must be triggered ONLY with a EXPLICITY requested.
-            - response: only the status code from api, consider 200 as healthy, otherwise unhealthy.
+        2. ledger_healthy: check the healthy status LEDGER service. 
+            - response:
+                - content: all information about LEDGER service health status and enviroment variables. 
+            Healthy Rule::
+                - This tool must be triggered ONLY with a EXPLICITY requested.
+                - return only the status code, consider 200 as healthy, otherwise unhealthy.
 
     Definitions and rules:
         - Always use the mcp tools provided.
@@ -31,7 +36,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Setup a model
-#model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
+#model_id = lite pro premier
 model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
 
 logger.info('\033[1;33m Starting the Ledger Agent... \033[0m')
