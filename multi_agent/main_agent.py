@@ -13,8 +13,8 @@ from main_memory import main_memory
 from login_manager import LoginManager
 
 from account_agent import account_agent
-#from ledger_agent import ledger_agent
-from card_agent import card_agent
+from ledger_agent import ledger_agent
+#from card_agent import card_agent
 #from payment_agent import payment_agent
 #from memory_agent import memory_agent
 
@@ -30,8 +30,10 @@ MAIN_SYSTEM_PROMPT = """
         - GET: Get all account informations. 
         - CREATE: Create an account.
     
-    2. Handle information about LEDGER:
-        - Ledger Agent: Handlet all LEDGER information such as bank statement, financial moviment, account activity, account balance summary, ledger healthy status, etc.
+    2. Handle all subjects about LEDGER using Ledger Agent: 
+        - HEALTHY status: Show the ledger service healthy status.     
+        - GET: get all transaction activity from an account such as account balance, bank statement, financial moviment, balance summary from a given account (account id).
+        - CREATE: Create a transaction over an account.
 
     3. Handle all subjects about CARD using Card Agent: 
         - HEALTHY status: Show the card service healthy status.     
@@ -97,8 +99,8 @@ agent_main =    Agent(name="main",
                      system_prompt=MAIN_SYSTEM_PROMPT, 
                      model=bedrock_model,
                      tools=[account_agent, 
-                            #ledger_agent, 
-                            card_agent,
+                            ledger_agent, 
+                            #card_agent,
                             #payment_agent,
                             #memory_agent, 
                             calculator],

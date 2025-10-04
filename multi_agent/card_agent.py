@@ -83,7 +83,7 @@ def card_agent(query: str) -> str:
     Process and respond all CARD queries using a specialized CARD agent.
     
     Args:
-        query: Given a card, create card, get card information and details, and check healthy status.
+        query: Given a card, create a card, get card information and details, and check healthy status.
         
     Returns:
         a card with its details.
