@@ -9,15 +9,33 @@ from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
 
 CARD_SYSTEM_PROMPT = """
-    You are CARD agent specialized to handle all informations about CARD such as account, atc, type, model (CREDIT or DEBIT), status.
+    You are CARD agent specialized to handle all informations about CARD.
 
     Card Operations:
-        1. get_card: Get CARD details such as accoount, atc, type, model (CREDIT or DEBIT), status.
-            - args: card number (card_number).
-            - response: card details such as account identificator(account_id), atc, card type, card model (CREDIT or DEBIT), card status.
+        1. get_card: Get CARD details such as card number, atc, type, model (CREDIT or DEBIT), status.
+            - args: 
+                - card: Exactly 12 digits split into 4 groups of 3 digits each.
+            - response: 
+                - card: details such as account associated, atc, card type, card model (CREDIT or DEBIT), card status.
+        
         2. card_healthy: healthy CARD service status.
-            - response: only the status code from api, consider 200 as healthy, otherwise unhealthy.
- 
+            - response: 
+                - content: all information about CARD service health status and enviroment variables.
+            Healthy Rule:
+                - This tool must be triggered ONLY with a EXPLICITY requested.
+                - return only the status code, consider 200 as healthy, otherwise unhealthy.
+
+        3. create_card: Create a CARD, always assume that the account provided already exists.
+            - args:
+                - card: Exactly 12 digits split into 4 groups of 3 digits each.
+                - account: account identificator (account_id) associated with a card. A account pattern is ACC-###.### or ACC-###
+                - holder: card holder name.
+                - type: CREDIT or DEBIT, the default value is CREDIT.
+                - model: CHIP or VIRTUAL, the default value is CHIP.
+                - status: ISSUED or PEDING, the default value is ISSUED.
+            - response: 
+                card: all card information. 
+
     Card Rules:
         1. All CARD numbers MUST be returned strictly in the format: 999.999.999.999
             - Exactly 12 digits split into 4 groups of 3 digits each.
@@ -36,7 +54,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Setup a model
-#model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
+#model_id = lite pro premier
 model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-pro-v1:0"  
 
 logger.info('\033[1;33m Starting the Card Agent... \033[0m')
@@ -65,7 +83,7 @@ def card_agent(query: str) -> str:
     Process and respond all CARD queries using a specialized CARD agent.
     
     Args:
-        query: Given an card nunber get information and details such as card service healthy status, card´s details such as card number, card model, card status, model, creation date, etc.
+        query: Given a card, create a card, get card information and details, and check healthy status.
         
     Returns:
         a card with its details.
@@ -91,7 +109,9 @@ def card_agent(query: str) -> str:
 
             selected_tools = [
                 t for t in all_tools 
-                if t.tool_name in ["card_healthy", "get_card"]
+                if t.tool_name in ["card_healthy", 
+                                   "create_card",
+                                   "get_card"]
             ]
 
             logger.info(f"Available MCP tools: {[tool.tool_name for tool in selected_tools]}")

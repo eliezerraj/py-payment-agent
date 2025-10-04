@@ -12,20 +12,38 @@ ACCOUNT_SYSTEM_PROMPT = """
     You are ACCOUNT agent specialized to handle all informations about ACCOUNT.
 
     Account Operations:
-        1. get_account: Get account details such as account id (account_id), owner account (person_id), date of creation (created_at) from a given account.
-            - args: account identificator (account_id).
-            - response: account details like, account id (account_id), person id (owner account), date of creation (created_at).
+        1. get_account: get account details such as account id (account_id), owner account (person_id), date of creation (created_at) from a given account (account_id)
+            - args: 
+                - account: account identificator (account_id).
+            - response: 
+                - account details like, account id (account_id), person id (owner account), date of creation (created_at).
         
-        2. get_accounts_from_person: get all accounts associated a given person.
-            - args: person identificator (person_id).
-            - reponse: List of accounts owned by a given person, account id (account_id), owner account (person_id), date of creation (created_at).
+        2. get_accounts_from_person: get all accounts associated/belongs a given person (person_id).
+            - args: 
+                - person: person identificator (person_id).
+            - reponse: 
+                - list: List of accounts owned/belongs by a given person (person id).
         
-        3. account_healthy: healthy account service status.
-            - response: only the status code from api, consider 200 as healthy, otherwise unhealthy.
+        3. account_healthy: check the healthy status ACCOUNT service.       
+            - response:
+                - content: all information about ACCOUNT service health status and enviroment variables. 
+            Healthy Rule::
+                - This tool must be triggered ONLY with a EXPLICITY requested.
+                - return only the status code, consider 200 as healthy, otherwise unhealthy.
 
-    Definitions and rules:
+        4. create_accont: Create an account.
+            - args: 
+                - account: account identificator (account_id)
+                - person: person identificator (person_id).
+            - response: 
+                - account: account details such as account id (account_id), person id (owner account), date of creation (created_at).       
+
+    Definitions and Rules:
         - Always use the mcp tools provided.
-        - USE EXACTLY the fields names provided by json response. ex: account_id, person_id, etc.
+        - The account pattern should be ACC-### or ACC-###.###
+        - The person pattern should be P-### or P-###.###
+        - USE EXACTLY the fields provided by query, DO NOT PARSE, DO NOT STRIP OF '.' or '-' or FORMAT.
+        - USE EXACTLY the fields names provided by json response. eg: account_id, person_id, etc.
         - DO NOT UPDATE any field format provided by mcp tool, use EXACTLY the mcp field result format.
 """
 
@@ -63,7 +81,7 @@ def account_agent(query: str) -> str:
     Process and respond all ACCOUNT queries using a specialized ACCOUNT agent.
     
     Args:
-        query: Given account identificator, get all information and details such as healthy status, account details such as account id, person id (owner), creation date, etc.
+        query: Given account, create account, get account informations and details, and check account healthy status.
         
     Returns:
         an account with all details.
@@ -77,19 +95,22 @@ def account_agent(query: str) -> str:
          
     context={"jwt":token}
 
-    # Format the query for the agent
-    formatted_query = f"Please process the following query: {query} with context:{context}"
-    all_tools = []
- 
     try:
         logger.info("Routed to Account Agent")
-        
+
+        # Format the query for the agent
+        formatted_query = f"Please process the following query: {query} with context:{context} and extract structured information"
+        all_tools = []
+         
         with streamable_http_mcp_server:
             all_tools.extend(streamable_http_mcp_server.list_tools_sync())
 
             selected_tools = [
                 t for t in all_tools 
-                if t.tool_name in ["account_healthy", "get_account", "get_accounts_from_person"]
+                if t.tool_name in ["account_healthy", 
+                                   "get_account",
+                                   "create_account", 
+                                   "get_account_from_person"]
             ]
 
             logger.info(f"Available MCP tools: {[tool.tool_name for tool in selected_tools]}")

@@ -13,11 +13,16 @@ PAYMENT_SYSTEM_PROMPT = """
 
     Payment Operations:
         1. get_card_payment: Get all PAYMENTS did by a card such as FOOD, GAS, COMPUTE.
-            - args: card id, card number and date of begin search.
-            - response: A list of payments with information such as card id, card type, card model, payment amount, terminal, payment status and payment date.
+            - args: 
+                - card: Exactly 12 digits split into 4 groups of 3 digits each. 
+                - date: date of begin search.
+            - response: 
+                - list: A list of payments with information such as card id, card type, card model, payment amount, terminal, payment status and payment date.
 
         2. payment_healthy: healthy PAYMENT service status.
-            - response: only the status code from api, consider 200 as healthy, otherwise unhealthy.
+            - This tool must be triggered ONLY with a EXPLICITY requested.
+            - response: 
+                - only the status code from api, consider 200 as healthy, otherwise unhealthy.
 
     Payment Rules:
         1. All PAYMENTS card number MUST be returned strictly in the format: 999.999.999.999.

@@ -3,20 +3,39 @@ import boto3
 
 from main_memory import main_memory
 
+from mcp.client.streamable_http import streamablehttp_client
+
 from strands import Agent, tool
 from strands.models import BedrockModel
-from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
 
-LEDGER_SYSTEM_PROMPT = """
-    You are LEDGER agent specialized to handle all LEDGER informations such as bank statement, financial moviment, account activity and account balances.
+from strands.hooks import HookProvider, HookRegistry, AfterInvocationEvent, BeforeInvocationEvent, BeforeToolCallEvent
 
-    Ledger Activity :
-        1. get_account_statement: Get account activity, account balances and statements from a given account (account id).
-            - args: account identificator (account_id).
-            - response: A list of bank statement, financial moviment, account activity and account balance summary.
-        2. ledger_healthy: healthy ledger service status.
-            - response: only the status code from api, consider 200 as healthy, otherwise unhealthy.
+LEDGER_SYSTEM_PROMPT = """
+    You are LEDGER agent specialized to handle informations about LEDGER.
+
+    Ledger Operations :
+        1. get_account_statement: get all transaction activity, account balance, statements from a given account (account id).
+            - args: 
+                - account: account identificator (account_id).
+            - response: 
+                - list: A list of bank statement, financial moviment, account activity and balance summary.
+        
+        2. ledger_healthy: check the healthy status LEDGER service.
+            - response:
+                - content: all information about LEDGER service health status and enviroment variables. 
+            Healthy Rule::
+                - This tool must be triggered ONLY with a EXPLICITY requested.
+                - return only the status code, consider 200 as healthy, otherwise unhealthy.
+
+        3. create_moviment_transaction: Create a transaction over an account, always assume that the account provided already exists.
+            - args:
+                - account: account identificator (account_id) associated with a card. A account pattern is ACC-###.### or ACC-###.
+                - type: DEPOSIT or WITHDRAW, the default value is DEPOSIT.
+                - currency: transaction currency as BRL, the default value is BRL.
+                - amount: transaction amount (float).
+            - response:
+                - transaction: all transaction information.
 
     Definitions and rules:
         - Always use the mcp tools provided.
@@ -29,8 +48,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Setup a model
-#model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
-model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-pro-v1:0"  
+#model_id = lite pro premier
+model_id = "arn:aws:bedrock:us-east-2:908671954593:inference-profile/us.amazon.nova-premier-v1:0"  
 
 logger.info('\033[1;33m Starting the Ledger Agent... \033[0m')
 logger.info(f'\033[1;33m model_id: {model_id} \033[0m \n')
@@ -52,17 +71,57 @@ def create_streamable_http_mcp_server():
 
 streamable_http_mcp_server = MCPClient(create_streamable_http_mcp_server)
 
+class ToolValidationError(Exception):
+    """Custom exception to abort tool calls immediately."""
+    pass
+
+class LedgerHook(HookProvider):
+    
+    def register_hooks(self, registry: HookRegistry) -> None:
+        #registry.add_callback(BeforeInvocationEvent, self.ledger_start)
+        #registry.add_callback(AfterInvocationEvent, self.ledger_end)
+        registry.add_callback(BeforeToolCallEvent, self.before_tool)
+
+    def ledger_start(self, event: BeforeInvocationEvent) -> None:
+        logger.info(f"**** ledger_start ***")
+
+    def ledger_end(self, event: AfterInvocationEvent) -> None:
+        logger.info(f"*** ledger_end *****")
+
+    def before_tool(self, event: BeforeToolCallEvent) -> None:
+        logger.info(f"*** before_tool ***")
+
+        tool_name = event.tool_use.get("name")
+        tool_input = event.tool_use.get("input", {})
+
+        if tool_name == "create_moviment_transaction":
+            amount = tool_input.get("amount")
+    
+            try:
+                amount = float(amount)
+            except Exception:
+                logger.error(f"Invalid amount: {amount}. Must be a numeric.")
+                raise ToolValidationError(f"Invalid amount: {amount}. Must be a numeric.")
+            
+            # Apply constraints
+            if amount <= 0 or amount > 1000:
+                logger.error(f"Invalid amount {amount}. Must be greater than 0 and less than 1000.")
+                raise ToolValidationError(f"Invalid amount {amount}.  Must be greater than 0 and less than 1000")
+        
+            logger.info(f"[LedgerHook] Validated transaction amount: {amount}")
+
 @tool
 def ledger_agent(query: str) -> str:
     """
     Process and respond all LEDGER queries using a specialized LEDGER agent.
 
     Args:
-        query: Given an account identificator (account_id) get information such as ledger service healhy status, bank statement, financial moviment, account activity, balances.
+        query: Given an transaction, create a transaction, get information such as ledger service healhy status, bank statement, financial moviment, account activity, balances.
         
     Returns:
         ledger information such as bank statement, financial moviment, account activity, balances.
     """
+
     logger.info("function => ledger_agent")
 
     token = main_memory.get_token()
@@ -84,7 +143,9 @@ def ledger_agent(query: str) -> str:
 
             selected_tools = [
                 t for t in all_tools 
-                if t.tool_name in ["ledger_healthy", "get_account_statement"]
+                if t.tool_name in ["ledger_healthy",
+                                   "create_moviment_transaction", 
+                                   "get_account_statement"]
             ]
 
             logger.info(f"Available MCP tools: {[tool.tool_name for tool in selected_tools]}")
@@ -94,17 +155,21 @@ def ledger_agent(query: str) -> str:
                         system_prompt=LEDGER_SYSTEM_PROMPT,
                         model=bedrock_model, 
                         tools=selected_tools,
+                        hooks=[LedgerHook()],
                         callback_handler=None
                     )
-            
-            agent_response = agent(formatted_query)
-            text_response = str(agent_response)
-
-            if len(text_response) > 0:
-                return text_response
-
-            return "Error but I couldn't process this request due a problem. Please check if your query is clearly stated or try rephrasing it."
     
+            try:
+                agent_response = agent(formatted_query)
+                text_response = str(agent_response)
+
+                if len(text_response) > 0:
+                    return text_response
+
+                return "Error but I couldn't process this request due a problem. Please check if your query is clearly stated or try rephrasing it."
+            
+            except ToolValidationError as e:
+                return f"Transaction aborted: {e}"
+       
     except Exception as e:
-        # Return specific error message for math processing
         return f"Error processing your query: {str(e)}"
