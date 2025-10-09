@@ -1,5 +1,7 @@
 import logging
 import boto3
+import time
+import json
 
 from main_memory import main_memory
 
@@ -9,7 +11,13 @@ from strands import Agent, tool
 from strands.models import BedrockModel
 from strands.tools.mcp.mcp_client import MCPClient
 
-from strands.hooks import HookProvider, HookRegistry, AfterInvocationEvent, BeforeInvocationEvent, BeforeToolCallEvent
+from strands.hooks import (HookProvider, 
+                           HookRegistry, 
+                           AfterInvocationEvent, 
+                           AfterToolCallEvent, 
+                           BeforeInvocationEvent, 
+                           BeforeToolCallEvent
+                    )
 
 LEDGER_SYSTEM_PROMPT = """
     You are LEDGER agent specialized to handle informations about LEDGER.
@@ -66,49 +74,80 @@ bedrock_model = BedrockModel(
 )
 
 # load mcp servers
-def create_streamable_http_mcp_server():
-    return streamablehttp_client("http://localhost:9002/mcp")
+mcp_url = "http://127.0.0.1:9002/mcp"
 
-streamable_http_mcp_server = MCPClient(create_streamable_http_mcp_server)
+def create_streamable_http_mcp_server(mcp_url: str):
+    return streamablehttp_client(mcp_url)
+
+streamable_http_mcp_server = MCPClient(lambda: create_streamable_http_mcp_server(mcp_url))
 
 class ToolValidationError(Exception):
     """Custom exception to abort tool calls immediately."""
     pass
 
-class LedgerHook(HookProvider):
-    
+# Agent hook setup
+class AgentHook(HookProvider):
+
+    def __init__(self):
+        self.start_agent = ""
+        self.tool_name = "unknown"
+        self.metrics = {}
+
     def register_hooks(self, registry: HookRegistry) -> None:
-        #registry.add_callback(BeforeInvocationEvent, self.ledger_start)
-        #registry.add_callback(AfterInvocationEvent, self.ledger_end)
+        registry.add_callback(BeforeInvocationEvent, self.agent_start)
+        registry.add_callback(AfterInvocationEvent, self.agent_end)
         registry.add_callback(BeforeToolCallEvent, self.before_tool)
+        registry.add_callback(AfterToolCallEvent, self.after_tool)
 
-    def ledger_start(self, event: BeforeInvocationEvent) -> None:
-        logger.info(f"**** ledger_start ***")
+    def agent_start(self, event: BeforeInvocationEvent) -> None:
+        logger.info(f" *** BeforeInvocationEvent **** ")
+        self.start_agent = time.time()
+        logger.info(f"Request started - Agent: {event.agent.name} : { self.start_agent }")
 
-    def ledger_end(self, event: AfterInvocationEvent) -> None:
-        logger.info(f"*** ledger_end *****")
+    def agent_end(self, event: AfterInvocationEvent) -> None:
+        logger.info(f" *** AfterInvocationEvent **** ")
+
+        duration = time.time() - self.start_agent
+        logger.info(f"Request completed - Agent: {event.agent.name} - Duration: {duration:.2f}s")
+        
+        self.metrics["total_requests"] = self.metrics.get("total_requests", 0) + 1
+        self.metrics["avg_duration"] = (
+            self.metrics.get("avg_duration", 0) * 0.9 + duration * 0.1 # Exponencial Moving Average 
+        )
+
+        logger.info(f" *** *** self.metrics *** *** ")
+        logger.info(f" {self.metrics}")
+        logger.info(f" *** *** self.metrics *** *** ")
 
     def before_tool(self, event: BeforeToolCallEvent) -> None:
-        logger.info(f"*** before_tool ***")
+        logger.info(f"*** Tool invocation - agent: {event.agent.name} : { event.tool_use.get('name') } *** ")
 
-        tool_name = event.tool_use.get("name")
+        self.tool_name = event.tool_use.get("name")
         tool_input = event.tool_use.get("input", {})
 
-        if tool_name == "create_moviment_transaction":
+        if self.tool_name == "create_moviment_transaction":
             amount = tool_input.get("amount")
     
             try:
                 amount = float(amount)
             except Exception:
                 logger.error(f"Invalid amount: {amount}. Must be a numeric.")
+                event.abort = True
                 raise ToolValidationError(f"Invalid amount: {amount}. Must be a numeric.")
             
             # Apply constraints
             if amount <= 0 or amount > 1000:
                 logger.error(f"Invalid amount {amount}. Must be greater than 0 and less than 1000.")
+                event.abort = True
                 raise ToolValidationError(f"Invalid amount {amount}.  Must be greater than 0 and less than 1000")
         
             logger.info(f"[LedgerHook] Validated transaction amount: {amount}")
+
+    def after_tool(self, event: AfterToolCallEvent) -> None:
+        logger.info(f" *** AfterToolCallEvent **** ")
+        
+        self.tool_name = event.tool_use.get("name")
+        logger.info(f"* Tool completed - agent: {event.agent.name} : {self.tool_name}")
 
 @tool
 def ledger_agent(query: str) -> str:
@@ -124,6 +163,7 @@ def ledger_agent(query: str) -> str:
 
     logger.info("function => ledger_agent")
 
+    # load access token
     token = main_memory.get_token()
     if not token:
         logger.error("Error, I couldn't process No JWT token available")
@@ -138,6 +178,8 @@ def ledger_agent(query: str) -> str:
     try:
         logger.info("Routed to Ledger Agent")
         
+        agent_hook = AgentHook()
+
         with streamable_http_mcp_server:
             all_tools.extend(streamable_http_mcp_server.list_tools_sync())
 
@@ -155,8 +197,8 @@ def ledger_agent(query: str) -> str:
                         system_prompt=LEDGER_SYSTEM_PROMPT,
                         model=bedrock_model, 
                         tools=selected_tools,
-                        hooks=[LedgerHook()],
-                        callback_handler=None
+                        hooks=[agent_hook],
+                        callback_handler=None,
                     )
     
             try:
@@ -164,12 +206,26 @@ def ledger_agent(query: str) -> str:
                 text_response = str(agent_response)
 
                 if len(text_response) > 0:
-                    return text_response
+                    return json.dumps({
+                        "status": "success",
+                        "response": text_response
+                    })
 
-                return "Error but I couldn't process this request due a problem. Please check if your query is clearly stated or try rephrasing it."
-            
+                return json.dumps({
+                    "status": "error",
+                    "reason": "Error but I couldn't process this request due a problem. Please check if your query is clearly stated or try rephrasing it."
+                })
+                        
             except ToolValidationError as e:
-                return f"Transaction aborted: {e}"
+                logger.error(f"Transaction aborted: {e}")
+                return json.dumps({
+                    "status": "error",
+                    "reason": f"Transaction aborted: {str(e)}"
+                })
        
     except Exception as e:
-        return f"Error processing your query: {str(e)}"
+        logger.error(f"Error processing your query: {str(e)}")
+        return json.dumps({
+            "status": "error",
+            "reason": f"Error processing your query: {str(e)}"
+        })

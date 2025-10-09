@@ -1,5 +1,7 @@
 import logging
 import boto3
+import time
+import json
 
 from main_memory import main_memory
 
@@ -7,6 +9,14 @@ from strands import Agent, tool
 from strands.models import BedrockModel
 from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
+
+from strands.hooks import (HookProvider, 
+                           HookRegistry, 
+                           AfterInvocationEvent, 
+                           AfterToolCallEvent, 
+                           BeforeInvocationEvent, 
+                           BeforeToolCallEvent
+                    )
 
 ACCOUNT_SYSTEM_PROMPT = """
     You are ACCOUNT agent specialized to handle all informations about ACCOUNT.
@@ -70,10 +80,59 @@ bedrock_model = BedrockModel(
 )
 
 # load mcp servers
-def create_streamable_http_mcp_server():
-    return streamablehttp_client("http://localhost:9002/mcp")
+mcp_url = "http://127.0.0.1:9002/mcp"
 
-streamable_http_mcp_server = MCPClient(create_streamable_http_mcp_server)
+def create_streamable_http_mcp_server(mcp_url: str):
+    return streamablehttp_client(mcp_url)
+
+streamable_http_mcp_server = MCPClient(lambda: create_streamable_http_mcp_server(mcp_url))
+
+class ToolValidationError(Exception):
+    """Custom exception to abort tool calls immediately."""
+    pass
+
+# Agent hook setup
+class AgentHook(HookProvider):
+
+    def __init__(self):
+        self.start_agent = ""
+        self.tool_name = "unknown"
+        self.metrics = {}
+
+    def register_hooks(self, registry: HookRegistry) -> None:
+        registry.add_callback(BeforeInvocationEvent, self.agent_start)
+        registry.add_callback(AfterInvocationEvent, self.agent_end)
+        registry.add_callback(BeforeToolCallEvent, self.before_tool)
+        registry.add_callback(AfterToolCallEvent, self.after_tool)
+
+    def agent_start(self, event: BeforeInvocationEvent) -> None:
+        logger.info(f" *** BeforeInvocationEvent **** ")
+        self.start_agent = time.time()
+        logger.info(f"Request started - Agent: {event.agent.name} : { self.start_agent }")
+
+    def agent_end(self, event: AfterInvocationEvent) -> None:
+        logger.info(f" *** AfterInvocationEvent **** ")
+
+        duration = time.time() - self.start_agent
+        logger.info(f"Request completed - Agent: {event.agent.name} - Duration: {duration:.2f}s")
+        
+        self.metrics["total_requests"] = self.metrics.get("total_requests", 0) + 1
+        self.metrics["avg_duration"] = (
+            self.metrics.get("avg_duration", 0) * 0.9 + duration * 0.1 # Exponencial Moving Average 
+        )
+
+        logger.info(f" *** *** self.metrics *** *** ")
+        logger.info(f" {self.metrics}")
+        logger.info(f" *** *** self.metrics *** *** ")
+
+    def before_tool(self, event: BeforeToolCallEvent) -> None:
+        logger.info(f"*** Tool invocation - agent: {event.agent.name} : { event.tool_use.get('name') } *** ")
+
+    def after_tool(self, event: AfterToolCallEvent) -> None:
+        logger.info(f" *** AfterToolCallEvent **** ")
+        
+        self.tool_name = event.tool_use.get("name")
+        logger.info(f"* Tool completed - agent: {event.agent.name} : {self.tool_name}")
 
 @tool
 def account_agent(query: str) -> str:
@@ -98,6 +157,8 @@ def account_agent(query: str) -> str:
     try:
         logger.info("Routed to Account Agent")
 
+        agent_hook = AgentHook()
+
         # Format the query for the agent
         formatted_query = f"Please process the following query: {query} with context:{context} and extract structured information"
         all_tools = []
@@ -120,17 +181,35 @@ def account_agent(query: str) -> str:
                         system_prompt=ACCOUNT_SYSTEM_PROMPT,
                         model=bedrock_model, 
                         tools=selected_tools,
+                        hooks=[agent_hook],
                         callback_handler=None
                     )
             
-            agent_response = agent(formatted_query)
-            text_response = str(agent_response)
+            try:
+                agent_response = agent(formatted_query)
+                text_response = str(agent_response)
 
-            if len(text_response) > 0:
-                return text_response
-
-            return "Error, I couldn't process this request due a problem. Please check if your query is clearly stated or try rephrasing it."
-    
+                if len(text_response) > 0:
+                    return json.dumps({
+                                "status": "success",
+                                "response": text_response
+                            })
+                
+                return json.dumps({
+                    "status": "error",
+                    "reason": "Error but I couldn't process this request due a problem. Please check if your query is clearly stated or try rephrasing it."
+                })  
+                
+            except ToolValidationError as e:
+                logger.error(f"Transaction aborted: {e}")
+                return json.dumps({
+                    "status": "error",
+                    "reason": f"Transaction aborted: {str(e)}"
+                })
+           
     except Exception as e:
-        # Return specific error message for math processing
-        return f"Error processing your query: {str(e)}"
+        logger.error(f"Error processing your query: {str(e)}")
+        return json.dumps({
+            "status": "error",
+            "reason": f"Error processing your query: {str(e)}"
+        })

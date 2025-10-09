@@ -14,8 +14,8 @@ from login_manager import LoginManager
 
 from account_agent import account_agent
 from ledger_agent import ledger_agent
-#from card_agent import card_agent
-#from payment_agent import payment_agent
+from card_agent import card_agent
+from payment_agent import payment_agent
 #from memory_agent import memory_agent
 
 from strands.agent.conversation_manager import SlidingWindowConversationManager
@@ -40,8 +40,13 @@ MAIN_SYSTEM_PROMPT = """
         - GET: Get all card informations. 
         - CREATE: Create a card.
 
+    4. Handle information about PAYMENT: 
+        - HEALTHY status: Show the payment service healthy status.     
+        - GET: Get all payment informations.
+        - CREATE: Create a payment.
+
     4. Handle information about PAYMENT:
-        - Payment Agent: Handle all PAYMENT subjects, payments done by a card, paymennt healthy status, payment amout and date, etc.
+        - Payment Agent: Handle all PAYMENT subjects, 
 
     5. Handle all healthy status for all agents mention above:
         - ALWAYS reply with EXACTLY with a service name: HEALTHY or UNHEALTHY, DO NOT include any explanations or other text. Whenever a request contains more than one service SHOW a list of services, NEVER sumarize the response.
@@ -100,8 +105,8 @@ agent_main =    Agent(name="main",
                      model=bedrock_model,
                      tools=[account_agent, 
                             ledger_agent, 
-                            #card_agent,
-                            #payment_agent,
+                            card_agent,
+                            payment_agent,
                             #memory_agent, 
                             calculator],
                      conversation_manager=conversation_manager,

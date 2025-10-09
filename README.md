@@ -22,14 +22,14 @@ check the current health status of CARD and ACCOUNT services and show the result
 check the current health status of all services avaiable and show the result
 
 ACCOUNT - OK
-show me the details of account ACC-301.001
+create an account with id ACC-302.201 and a person P-302.201
+create 3 accounts with id from ACC-800.107 and a from person P-800.107 respectively
+create 3 accounts with id from ACC-800.110 but all of then must belongs for same person P-800.110
+
+show me the details of account ACC-302.250 
 show me the current details of account ACC-4.000.002 
 get all details of account ACC-4.000.003 and ACC-4.000.004
 show me the infos of account ACC-200, ACC-201
-
-create an account with id ACC-301.002 and a person P-301.002
-create 3 accounts with id from ACC-800.107 and a from person P-800.107 respectively
-create 3 accounts with id from ACC-800.110 but all of then must belongs for same person P-800.110
 
 ACCOUNT-PERSON - OK
 show me the P-750 person's account
@@ -39,19 +39,19 @@ show me all accounts of person P-721 and P-722
 check the current the accounts belongs to a person P-723
 
 LEDGER
-show me the bank statement of account ACC-5.000.000
+make a transaction type DEPOSIT, amount 2000 currency BRL over account ACC-301.002
+make a DEPOSIT, amount BRL 900.00 over account ACC-302.201
+
+show me the bank statement of account ACC-302.201
 show me all financial statements account ACC-4.000.000
 which are the account activity of account ACC-4.000.003
 show me the detailed balance summary of account ACC-4.000.003
-
-make a transaction type DEPOSIT, amount 120 currency BRL over account ACC-301.002
-make a WITHDRAW, amount BRL 1001.90 over account ACC-301.002
 
 CARD 
 show me the data of card 111.004.000.004
 get all details of card 111.111.004.002
 get all details of cards 111.111.004.000 and 111.111.004.004
-create a card number 333.000.301.002 type DEBIT model CHIP holder eliezer and associated with an account ACC-301.002
+create a card number 333.000.302.201 type DEBIT model CHIP holder eliezer-jr and associated with an account ACC-302.201
 
 
 Playbook
@@ -64,6 +64,7 @@ PAYMENT
 show me the payments of card 111.004.000.000 after 2025-09-21 
 show me the payments of card 111.004.000.004 after 2025-09-21  
 
+make a payment over a card 111.004.000.004 CREDIT, terminal TERM-2, for a GAS with amount amount BRL 310.00
 
 MEMORY
 store the info: "id": 1532, "account_id": "ACC-4.000.000", "person_id": "P-4.000.000", "created_at": "2025-09-30T16:28:07.925031Z"
