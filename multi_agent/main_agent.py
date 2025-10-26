@@ -4,22 +4,49 @@ import boto3
 import re
 import asyncio
 import shutil
+from dotenv import load_dotenv
 
 from strands import Agent
 from strands.models import BedrockModel
 from strands_tools import calculator
+from strands.telemetry import StrandsTelemetry
+from strands.agent.conversation_manager import SlidingWindowConversationManager
+from strands.session.file_session_manager import FileSessionManager
 
 from main_memory import main_memory
 from login_manager import LoginManager
-
 from account_agent import account_agent
-from ledger_agent import ledger_agent
-from card_agent import card_agent
-from payment_agent import payment_agent
+#from ledger_agent import ledger_agent
+#from card_agent import card_agent
+#from payment_agent import payment_agent
 #from memory_agent import memory_agent
 
-from strands.agent.conversation_manager import SlidingWindowConversationManager
-from strands.session.file_session_manager import FileSessionManager
+# -------------------------------------------
+# Startup configuration
+# -------------------------------------------
+
+# Load .env file
+load_dotenv()
+
+# Telemetry configuration
+POD_NAME = os.getenv("POD_NAME")
+OTEL_EXPORTER_OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+SESSION_ID = os.getenv("SESSION_ID")
+OTEL_RESOURCE_ATTRIBUTES = POD_NAME
+
+print("---" * 15)
+print(f"POD_NAME: {POD_NAME}")
+print(f"OTEL_EXPORTER_OTLP_ENDPOINT: {OTEL_EXPORTER_OTLP_ENDPOINT}")
+print(f"OTEL_RESOURCE_ATTRIBUTES: {OTEL_RESOURCE_ATTRIBUTES}")
+print(f"SESSION_ID: {SESSION_ID}")
+print("---" * 15)
+
+# Setup telemetry
+strands_telemetry = StrandsTelemetry()
+strands_telemetry.setup_otlp_exporter()
+strands_telemetry.setup_meter(
+    enable_console_exporter=False,
+    enable_otlp_exporter=True)  
 
 # Define a focused system prompt for file operations
 MAIN_SYSTEM_PROMPT = """
@@ -82,6 +109,7 @@ session = boto3.Session(
     region_name='us-east-2',
 )
 
+# Create Bedrock model
 bedrock_model = BedrockModel(
         model_id=model_id,
         temperature=0.0,
@@ -95,7 +123,6 @@ conversation_manager = SlidingWindowConversationManager(
 )
 
 # Create a session manager with a unique session ID
-SESSION_ID='eliezer-006'
 session_manager = FileSessionManager(session_id=SESSION_ID,
                                      storage_dir="./sessions")
 
@@ -104,9 +131,9 @@ agent_main =    Agent(name="main",
                      system_prompt=MAIN_SYSTEM_PROMPT, 
                      model=bedrock_model,
                      tools=[account_agent, 
-                            ledger_agent, 
-                            card_agent,
-                            payment_agent,
+                            #ledger_agent, 
+                            #card_agent,
+                            #payment_agent,
                             #memory_agent, 
                             calculator],
                      conversation_manager=conversation_manager,
@@ -122,6 +149,7 @@ def strip_thinking(text: str) -> str:
     
     return re.sub(r"<thinking>.*?</thinking>", "", text, flags=re.DOTALL).strip()
 
+# Clear session files
 def clear_session(session_manager):
     session_dir  = os.path.join(session_manager.storage_dir, f"session_{session_manager.session_id}")
     logger.info(f"Cleaning session files: {session_dir }")
@@ -140,13 +168,9 @@ def clear_session(session_manager):
 # Example usage
 if __name__ == "__main__":
     
-    print('\033[1;33m Multi Agent v0.5 \033[0m \n')
+    print('\033[1;33m Multi Agent v 0.5 \033[0m \n')
 
     print("This agent helps to interact with another agent.")
-    print("Try commands like: /n")
-    print("- show me the information about account ACC-100")
-    print("- which are the accounts from person P-2")
-    print("- show me all financial statements account ACC-1000") 
     print("Type 'exit' to quit. \n")
 
     print('\033[1;31m Please login before continuing ... \033[0m \n')
