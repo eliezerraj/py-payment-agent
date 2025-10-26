@@ -73,6 +73,7 @@ session = boto3.Session(
     region_name='us-east-2',
 )
 
+# Create Bedrock model
 bedrock_model = BedrockModel(
         model_id=model_id,
         temperature=0.0,
@@ -99,17 +100,20 @@ class AgentHook(HookProvider):
         self.tool_name = "unknown"
         self.metrics = {}
 
+    # Register hooks
     def register_hooks(self, registry: HookRegistry) -> None:
         registry.add_callback(BeforeInvocationEvent, self.agent_start)
         registry.add_callback(AfterInvocationEvent, self.agent_end)
         registry.add_callback(BeforeToolCallEvent, self.before_tool)
         registry.add_callback(AfterToolCallEvent, self.after_tool)
 
+    # Hook implementations start (get time, log tool usage, collect metrics, etc.)
     def agent_start(self, event: BeforeInvocationEvent) -> None:
         logger.info(f" *** BeforeInvocationEvent **** ")
         self.start_agent = time.time()
         logger.info(f"Request started - Agent: {event.agent.name} : { self.start_agent }")
 
+    # Hook implementations end (get time, log tool usage, collect metrics, etc.)
     def agent_end(self, event: AfterInvocationEvent) -> None:
         logger.info(f" *** AfterInvocationEvent **** ")
 
@@ -151,8 +155,10 @@ def account_agent(query: str) -> str:
     if not token:
         logger.error("Error, I couldn't process No JWT token available")
         return "Error, I couldn't process No JWT token available"
-         
-    context={"jwt":token}
+
+    context={
+        "jwt":token
+    }
 
     try:
         logger.info("Routed to Account Agent")
@@ -160,7 +166,7 @@ def account_agent(query: str) -> str:
         agent_hook = AgentHook()
 
         # Format the query for the agent
-        formatted_query = f"Please process the following query: {query} with context:{context} and extract structured information"
+        formatted_query = f"Please process the following query: {query} with context: {context} and extract structured information"
         all_tools = []
          
         with streamable_http_mcp_server:
@@ -176,7 +182,7 @@ def account_agent(query: str) -> str:
 
             logger.info(f"Available MCP tools: {[tool.tool_name for tool in selected_tools]}")
 
-            # Create the math agent with calculator capability
+            # Create the account agent
             agent = Agent(name="main",
                         system_prompt=ACCOUNT_SYSTEM_PROMPT,
                         model=bedrock_model, 
@@ -189,6 +195,7 @@ def account_agent(query: str) -> str:
                 agent_response = agent(formatted_query)
                 text_response = str(agent_response)
 
+                # Clean the message
                 if len(text_response) > 0:
                     return json.dumps({
                                 "status": "success",

@@ -15,6 +15,12 @@ pip install --force-reinstall strands-agents-tools
 # run
 python3 agent.py
 
+# otel env
+export OTEL_EXPORTER_OTLP_ENDPOINT="localhost:4317"
+
+# test local otel
+kubectl port-forward svc/arch-eks-01-02-otel-collector-collector  4317:4317
+
 HEALTH-ok
 check the current health status of ACCOUNT services and show the result
 check the current health status of LEDGER services and show the result
