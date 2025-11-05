@@ -156,14 +156,14 @@ def card_agent(query: str) -> str:
          
     context={"jwt":token}
 
-    # Format the query for the agent
-    formatted_query = f"Please process the following query: {query} with context:{context}"
-    all_tools = []
-    
     try:
         logger.info("Routed to Card Agent")
 
         agent_hook = AgentHook()
+
+        # Format the query for the agent
+        formatted_query = f"Please process the following query: {query} with context: {context} and extract structured information"
+        all_tools = []
 
         with streamable_http_mcp_server:
             all_tools.extend(streamable_http_mcp_server.list_tools_sync())

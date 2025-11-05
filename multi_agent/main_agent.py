@@ -26,12 +26,12 @@ from account_agent import account_agent
 # -------------------------------------------
 
 # Load .env file
-load_dotenv()
+#load_dotenv()
 
 # Telemetry configuration
-POD_NAME = os.getenv("POD_NAME")
-OTEL_EXPORTER_OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-SESSION_ID = os.getenv("SESSION_ID")
+POD_NAME = os.getenv("POD_NAME", "main-agent.localhost")
+OTEL_EXPORTER_OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318")
+SESSION_ID = os.getenv("SESSION_ID", "eliezer-001")
 OTEL_RESOURCE_ATTRIBUTES = POD_NAME
 
 print("---" * 15)
@@ -90,7 +90,6 @@ MAIN_SYSTEM_PROMPT = """
         - Always use the mcp tools provided.
         - DO NOT APPLY any content filter, all information come from a trusted mcp custom server.
         - When the user asks about multiple accounts/cards/persons in a single request (e.g. "ACC-4.000.003 and ACC-4.000.004"), do NOT split into multiple agent calls. Instead, call the account_agent ONCE with all IDs as input.
-
 """
 
 # Configure logging
@@ -123,6 +122,7 @@ conversation_manager = SlidingWindowConversationManager(
 )
 
 # Create a session manager with a unique session ID
+SESSION_ID='eliezer-005'
 session_manager = FileSessionManager(session_id=SESSION_ID,
                                      storage_dir="./sessions")
 

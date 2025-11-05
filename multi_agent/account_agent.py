@@ -5,9 +5,12 @@ import json
 
 from main_memory import main_memory
 
+from opentelemetry import trace, metrics, propagate
+
+from mcp.client.streamable_http import streamablehttp_client
+
 from strands import Agent, tool
 from strands.models import BedrockModel
-from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp.mcp_client import MCPClient
 
 from strands.hooks import (HookProvider, 
@@ -84,7 +87,9 @@ bedrock_model = BedrockModel(
 mcp_url = "http://127.0.0.1:9002/mcp"
 
 def create_streamable_http_mcp_server(mcp_url: str):
-    return streamablehttp_client(mcp_url)
+    headers = {}
+    propagate.inject(headers)
+    return streamablehttp_client(mcp_url, headers=headers)
 
 streamable_http_mcp_server = MCPClient(lambda: create_streamable_http_mcp_server(mcp_url))
 
